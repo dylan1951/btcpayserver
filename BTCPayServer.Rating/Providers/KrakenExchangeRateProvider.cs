@@ -49,6 +49,7 @@ namespace BTCPayServer.Services.Rates
             { "XETH", "ETH" },
             { "USDC", "USDC" }, // On A=A purpose
             { "XZEC", "ZEC" },
+            { "XNO", "XNO" },
             { "XLTC", "LTC" },
             { "XXRP", "XRP" },
         };

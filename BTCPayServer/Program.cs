@@ -35,6 +35,7 @@ namespace BTCPayServer
             var logs = new Logs();
             logs.Configure(loggerFactory);
             IConfiguration conf = null;
+            
             try
             {
                 var confBuilder = new DefaultConfiguration() { Logger = logger }.CreateConfigurationBuilder(args);
@@ -84,6 +85,9 @@ namespace BTCPayServer
                 host = builder.Build();
                 await host.StartWithTasksAsync();
                 var urls = host.ServerFeatures.Get<IServerAddressesFeature>().Addresses;
+                
+                logger.LogInformation("before listen");
+                
                 foreach (var url in urls)
                 {
                     // Some tools such as dotnet watch parse this exact log to open the browser
@@ -93,17 +97,20 @@ namespace BTCPayServer
             }
             catch (ConfigException ex)
             {
+                logger.LogInformation("caught ConfigException");
                 if (!string.IsNullOrEmpty(ex.Message))
                     logs.Configuration.LogError(ex.Message);
             }
             catch (Exception e) when (PluginManager.IsExceptionByPlugin(e, out var pluginName))
             {
+                logger.LogInformation("caught Exception");
                 logs.Configuration.LogError(e, $"Disabling plugin {pluginName} as it crashed on startup");
                 var pluginDir = new DataDirectories().Configure(conf).PluginDir;
                 PluginManager.DisablePlugin(pluginDir, pluginName);
             }
             finally
             {
+                
                 processor.Dispose();
                 if (host == null)
                     logs.Configuration.LogError("Configuration error");

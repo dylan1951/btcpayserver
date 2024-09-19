@@ -7,6 +7,8 @@
     <PreserveCompilationContext>true</PreserveCompilationContext>
     <RunAnalyzersDuringLiveAnalysis>False</RunAnalyzersDuringLiveAnalysis>
     <RunAnalyzersDuringBuild>False</RunAnalyzersDuringBuild>
+    <Configurations>Debug;Release;Altcoins-Debug</Configurations>
+    <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
    <ItemGroup>
      <AssemblyAttribute Condition="'$(GitCommit)' != ''" Include="BTCPayServer.GitCommitAttribute">
