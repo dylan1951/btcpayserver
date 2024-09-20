@@ -16,7 +16,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
 
         public bool AllAvailable()
         {
-            return _NanoRpcProvider.Summaries.All(pair => pair.Value.WalletAvailable);
+            return _NanoRpcProvider.Summaries.All(pair => pair.Value.PippinAvailable);
         }
 
         public string Partial { get; } = "Nano/NanoSyncSummary";
@@ -35,7 +35,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
         {
             get
             {
-                return Summary?.WalletAvailable ?? false;
+                return true;
             }
         }
 

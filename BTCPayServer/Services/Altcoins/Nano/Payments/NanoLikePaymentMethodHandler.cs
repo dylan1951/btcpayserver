@@ -43,13 +43,14 @@ namespace BTCPayServer.Services.Altcoins.Nano.Payments
             context.Prompt.Divisibility = _network.Divisibility;
             if (context.Prompt.Activated)
             {
-                var walletClient = _NanoRpcProvider.WalletRpcClients[_network.CryptoCode];
-                var daemonClient = _NanoRpcProvider.DaemonRpcClients[_network.CryptoCode];
+                var pippinClient = _NanoRpcProvider.PippinClients[_network.CryptoCode];
                 var config = ParsePaymentMethodConfig(context.PaymentMethodConfig);
                 context.State = new Prepare()
                 {
-                    GetFeeRate = daemonClient.SendCommandAsync<GetFeeEstimateRequest, GetFeeEstimateResponse>("get_fee_estimate", new GetFeeEstimateRequest()),
-                    ReserveAddress = s => walletClient.SendCommandAsync<CreateAddressRequest, CreateAddressResponse>("create_address", new CreateAddressRequest() { Label = $"btcpay invoice #{s}", }),
+                    ReserveAddress = s => pippinClient.SendCommandAsync<AccountCreateRequest, AccountCreateResponse>(new AccountCreateRequest
+                    {
+                        Wallet = "220e2ed1-7832-4f01-9e18-8bf210d12e2d"
+                    })
                 };
             }
             return Task.CompletedTask;
@@ -59,15 +60,15 @@ namespace BTCPayServer.Services.Altcoins.Nano.Payments
             if (!_NanoRpcProvider.IsAvailable(_network.CryptoCode))
                 throw new PaymentMethodUnavailableException($"Node or wallet not available");
             var invoice = context.InvoiceEntity;
-            var NanoPrepare = (Prepare)context.State;
-            var address = await NanoPrepare.ReserveAddress(invoice.Id);
+            var nanoPrepare = (Prepare)context.State;
+            var address = await nanoPrepare.ReserveAddress(invoice.Id);
             
+            context.TrackedDestinations.Add(address + "#");
             context.Prompt.PaymentMethodFee = 0;
+            context.Prompt.Destination = address.Account;
             context.Prompt.Details = JObject.FromObject(new NanoPaymentPromptDetails()
             {
-                AccountIndex = NanoPrepare.AccountIndex,
-                AddressIndex = address.AddressIndex,
-                DepositAddress = address.Address
+                DepositAddress = address.Account
             }, Serializer);
         }
 
@@ -87,14 +88,10 @@ namespace BTCPayServer.Services.Altcoins.Nano.Payments
         {
             return config.ToObject<NanoPaymentMethodConfig>(Serializer) ?? throw new FormatException($"Invalid {nameof(NanoPaymentMethodConfig)}");
         }
-
-
-
+        
         class Prepare
         {
-            public Task<GetFeeEstimateResponse> GetFeeRate;
-            public Func<string, Task<CreateAddressResponse>> ReserveAddress;
-            public long AccountIndex { get; internal set; }
+            public Func<string, Task<AccountCreateResponse>> ReserveAddress;
         }
 
         public CheckoutUIPaymentMethodSettings GetCheckoutUISettings()

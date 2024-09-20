@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using BTCPayServer.Payments;
@@ -42,12 +43,12 @@ namespace BTCPayServer.Services.Altcoins.Nano.Payments
                        .FirstOrDefault();
                     if (details is not null)
                     {
-                        context.Model.ReceivedConfirmations = details.ConfirmationCount;
-                        context.Model.RequiredConfirmations = (int)NanoListener.ConfirmationsRequired(context.InvoiceEntity.SpeedPolicy);
+                        
                     }
                 }
                 context.Model.InvoiceBitcoinUrl = paymentLinkExtension.GetPaymentLink(context.Prompt, context.UrlHelper);
                 context.Model.InvoiceBitcoinUrlQR = context.Model.InvoiceBitcoinUrl;
+                context.Model.BtcAddress = context.Prompt.Destination;
             }
             else
             {

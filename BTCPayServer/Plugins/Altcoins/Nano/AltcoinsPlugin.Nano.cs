@@ -22,7 +22,7 @@ public partial class AltcoinsPlugin
         {
             CryptoCode = "XNO",
             DisplayName = "Nano",
-            Divisibility = 30,
+            Divisibility = 12,
             DefaultRateRules = new[]
             {
                 "XNO_X = XNO_BTC * BTC_X",
@@ -65,8 +65,7 @@ public partial class AltcoinsPlugin
         foreach (var nanoLikeSpecificBtcPayNetwork in supportedNetworks)
         {
             var daemonUri =
-                configuration.GetOrDefault<Uri>(
-                    $"{nanoLikeSpecificBtcPayNetwork.CryptoCode}_pippin_uri", null);
+                configuration.GetOrDefault<Uri>($"{nanoLikeSpecificBtcPayNetwork.CryptoCode}_pippin_uri", null);
             if (daemonUri == null)
             {
                 throw new ConfigException($"{nanoLikeSpecificBtcPayNetwork.CryptoCode} is misconfigured");
@@ -74,7 +73,7 @@ public partial class AltcoinsPlugin
 
             result.NanoLikeConfigurationItems.Add(nanoLikeSpecificBtcPayNetwork.CryptoCode, new NanoLikeConfigurationItem()
             {
-                DaemonRpcUri = daemonUri
+                PippinUri = daemonUri
             });
         }
         return result;

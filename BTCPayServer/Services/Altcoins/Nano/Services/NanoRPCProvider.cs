@@ -15,11 +15,9 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
     {
         private readonly NanoLikeConfiguration _NanoLikeConfiguration;
         private readonly EventAggregator _eventAggregator;
-        public ImmutableDictionary<string, JsonRpcClient> DaemonRpcClients;
-        public ImmutableDictionary<string, JsonRpcClient> WalletRpcClients;
+        public ImmutableDictionary<string, JsonRpcClient> PippinClients;
 
-        private readonly ConcurrentDictionary<string, NanoLikeSummary> _summaries =
-            new ConcurrentDictionary<string, NanoLikeSummary>();
+        private readonly ConcurrentDictionary<string, NanoLikeSummary> _summaries = new();
 
         public ConcurrentDictionary<string, NanoLikeSummary> Summaries => _summaries;
 
@@ -27,12 +25,9 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
         {
             _NanoLikeConfiguration = NanoLikeConfiguration;
             _eventAggregator = eventAggregator;
-            DaemonRpcClients =
+            PippinClients =
                 _NanoLikeConfiguration.NanoLikeConfigurationItems.ToImmutableDictionary(pair => pair.Key,
-                    pair => new JsonRpcClient(pair.Value.DaemonRpcUri, "", "", httpClientFactory.CreateClient()));
-            WalletRpcClients =
-                _NanoLikeConfiguration.NanoLikeConfigurationItems.ToImmutableDictionary(pair => pair.Key,
-                    pair => new JsonRpcClient(pair.Value.DaemonRpcUri, "", "", httpClientFactory.CreateClient()));
+                    pair => new JsonRpcClient(pair.Value.PippinUri, httpClientFactory.CreateClient()));
         }
 
         public bool IsAvailable(string cryptoCode)
@@ -43,14 +38,12 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
 
         private bool IsAvailable(NanoLikeSummary summary)
         {
-            return summary.Synced &&
-                   summary.WalletAvailable;
+            return true;
         }
 
         public async Task<NanoLikeSummary> UpdateSummary(string cryptoCode)
         {
-            if (!DaemonRpcClients.TryGetValue(cryptoCode.ToUpperInvariant(), out var daemonRpcClient) ||
-                !WalletRpcClients.TryGetValue(cryptoCode.ToUpperInvariant(), out var walletRpcClient))
+            if (!PippinClients.TryGetValue(cryptoCode.ToUpperInvariant(), out var pippinClient))
             {
                 return null;
             }
@@ -58,35 +51,13 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
             var summary = new NanoLikeSummary();
             try
             {
-                var daemonResult =
-                    await daemonRpcClient.SendCommandAsync<JsonRpcClient.NoRequestModel, SyncInfoResponse>("sync_info",
-                        JsonRpcClient.NoRequestModel.Instance);
-
-                summary.TargetHeight = daemonResult.TargetHeight.GetValueOrDefault(0);
-                summary.CurrentHeight = daemonResult.Height;
-                summary.TargetHeight = summary.TargetHeight == 0 ? summary.CurrentHeight : summary.TargetHeight;
-                summary.Synced = daemonResult.Height >= summary.TargetHeight && summary.CurrentHeight > 0;
-                summary.UpdatedAt = DateTime.Now;
-                summary.DaemonAvailable = true;
+                await pippinClient.SendCommandAsync<VersionRequest, VersionResponse>(new VersionRequest());
+                summary.PippinAvailable = true;
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
-                summary.DaemonAvailable = false;
-            }
-
-            try
-            {
-                var walletResult =
-                    await walletRpcClient.SendCommandAsync<JsonRpcClient.NoRequestModel, GetHeightResponse>(
-                        "get_height", JsonRpcClient.NoRequestModel.Instance);
-
-                summary.WalletHeight = walletResult.Height;
-                summary.WalletAvailable = true;
-            }
-            catch
-            {
-                summary.WalletAvailable = false;
+                summary.PippinAvailable = false;
             }
 
             var changed = !_summaries.ContainsKey(cryptoCode) || IsAvailable(cryptoCode) != IsAvailable(summary);
@@ -109,15 +80,9 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
 
         public class NanoLikeSummary
         {
-            public bool Synced { get; set; }
-            public long CurrentHeight { get; set; }
-            public long WalletHeight { get; set; }
-            public long TargetHeight { get; set; }
-            public DateTime UpdatedAt { get; set; }
-            public bool DaemonAvailable { get; set; }
-            public bool WalletAvailable { get; set; }
+            public bool PippinAvailable { get; set; }
 
-            public override String ToString() { return String.Format(CultureInfo.InvariantCulture, "{0} {1} {2} {3} {4} {5}", Synced, CurrentHeight, TargetHeight, WalletHeight, DaemonAvailable, WalletAvailable); }
+            public override String ToString() { return String.Format(CultureInfo.InvariantCulture, "{0}", PippinAvailable); }
         }
     }
 }

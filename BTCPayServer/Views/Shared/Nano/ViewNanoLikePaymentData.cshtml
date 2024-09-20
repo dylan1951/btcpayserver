@@ -22,14 +22,9 @@
         m.DepositAddress = payment.Destination;
         m.Amount = payment.Value.ToString(CultureInfo.InvariantCulture);
 
-		var confReq = NanoListener.ConfirmationsRequired(payment.InvoiceEntity.SpeedPolicy);
-		var confCount = onChainPaymentData.ConfirmationCount;
-		confCount = Math.Min(confReq, confCount);
-		m.Confirmations = $"{confCount} / {confReq}";
-
-        m.TransactionId = onChainPaymentData.TransactionId;
+        m.TransactionId = onChainPaymentData.TransactionHash;
         m.ReceivedTime = payment.ReceivedTime;
-		m.TransactionLink = TransactionLinkProviders.GetTransactionLink(m.Crypto, onChainPaymentData.TransactionId);
+		m.TransactionLink = TransactionLinkProviders.GetTransactionLink(m.Crypto, onChainPaymentData.TransactionHash);
         return m;
     }).Where(c => c != null).ToList();
 }

@@ -19,6 +19,7 @@ using BTCPayServer.Services.Invoices;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
+using NBitcoin.Scripting;
 using NBitpayClient;
 using NBXplorer;
 using Newtonsoft.Json.Linq;
@@ -108,16 +109,9 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
                 return;
             }
 
-            if (!string.IsNullOrEmpty(obj.BlockHash))
+            if (!string.IsNullOrEmpty(obj.Hash))
             {
-                if (!_requests.Writer.TryWrite(() => OnNewBlock(obj.CryptoCode))) {
-                    _logger.LogWarning($"Failed to write new block task to channel");
-                }
-            }
-
-            if (!string.IsNullOrEmpty(obj.TransactionHash))
-            {
-                if (!_requests.Writer.TryWrite(() => OnTransactionUpdated(obj.CryptoCode, obj.TransactionHash))) {
+                if (!_requests.Writer.TryWrite(() => OnTransaction(obj.CryptoCode, obj))) {
                     _logger.LogWarning($"Failed to write new tx task to channel");
                 }
             }
@@ -127,8 +121,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
         {
             _logger.LogInformation(
                 $"Invoice {invoice.Id} received payment {payment.Value} {payment.Currency} {payment.Id}");
-
-
+            
             var prompt = invoice.GetPaymentPrompt(payment.PaymentMethodId);
 
             if (prompt != null &&
@@ -136,6 +129,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
                 prompt.Destination == payment.Destination &&
                 prompt.Calculate().Due > 0.0m)
             {
+                //todo: wtf does this do
                 await _invoiceActivator.ActivateInvoicePaymentMethod(invoice.Id, payment.PaymentMethodId, true);
                 invoice = await _invoiceRepository.GetInvoice(invoice.Id);
             }
@@ -151,7 +145,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
                 return;
             }
 
-            var NanoWalletRpcClient = _NanoRpcProvider.WalletRpcClients[cryptoCode];
+            var NanoWalletRpcClient = _NanoRpcProvider.PippinClients[cryptoCode];
             var network = _networkProvider.GetNetwork(cryptoCode);
 
             var paymentId = PaymentTypes.CHAIN.GetPaymentMethodId(network.CryptoCode);
@@ -175,72 +169,72 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
 
             var accountToAddressQuery = new Dictionary<long, List<long>>();
             //create list of subaddresses to account to query the Nano wallet
-            foreach (var expandedInvoice in expandedInvoices)
-            {
-                var addressIndexList =
-                    accountToAddressQuery.GetValueOrDefault(expandedInvoice.PaymentMethodDetails.AccountIndex,
-                        new List<long>());
+            // foreach (var expandedInvoice in expandedInvoices)
+            // {
+            //     var addressIndexList =
+            //         accountToAddressQuery.GetValueOrDefault(expandedInvoice.PaymentMethodDetails.AccountIndex,
+            //             new List<long>());
+            //
+            //     addressIndexList.AddRange(
+            //         expandedInvoice.ExistingPayments.Select(tuple => tuple.PaymentData.SubaddressIndex));
+            //     addressIndexList.Add(expandedInvoice.PaymentMethodDetails.AddressIndex);
+            //     accountToAddressQuery.AddOrReplace(expandedInvoice.PaymentMethodDetails.AccountIndex, addressIndexList);
+            // }
 
-                addressIndexList.AddRange(
-                    expandedInvoice.ExistingPayments.Select(tuple => tuple.PaymentData.SubaddressIndex));
-                addressIndexList.Add(expandedInvoice.PaymentMethodDetails.AddressIndex);
-                accountToAddressQuery.AddOrReplace(expandedInvoice.PaymentMethodDetails.AccountIndex, addressIndexList);
-            }
+            // var tasks = accountToAddressQuery.ToDictionary(datas => datas.Key,
+            //     datas => NanoWalletRpcClient.SendCommandAsync<GetTransfersRequest, GetTransfersResponse>(
+            //         "get_transfers",
+            //         new GetTransfersRequest()
+            //         {
+            //             AccountIndex = datas.Key,
+            //             In = true,
+            //             SubaddrIndices = datas.Value.Distinct().ToList()
+            //         }));
 
-            var tasks = accountToAddressQuery.ToDictionary(datas => datas.Key,
-                datas => NanoWalletRpcClient.SendCommandAsync<GetTransfersRequest, GetTransfersResponse>(
-                    "get_transfers",
-                    new GetTransfersRequest()
-                    {
-                        AccountIndex = datas.Key,
-                        In = true,
-                        SubaddrIndices = datas.Value.Distinct().ToList()
-                    }));
-
-            await Task.WhenAll(tasks.Values);
+            // await Task.WhenAll(tasks.Values);
 
 
             var transferProcessingTasks = new List<Task>();
 
             var updatedPaymentEntities = new BlockingCollection<(PaymentEntity Payment, InvoiceEntity invoice)>();
-            foreach (var keyValuePair in tasks)
-            {
-                var transfers = keyValuePair.Value.Result.In;
-                if (transfers == null)
-                {
-                    continue;
-                }
-
-                transferProcessingTasks.AddRange(transfers.Select(transfer =>
-                {
-                    InvoiceEntity invoice = null;
-                    var existingMatch = existingPaymentData.SingleOrDefault(tuple =>
-                        tuple.Payment.Destination == transfer.Address &&
-                        tuple.PaymentData.TransactionId == transfer.Txid);
-
-                    if (existingMatch.Invoice != null)
-                    {
-                        invoice = existingMatch.Invoice;
-                    }
-                    else
-                    {
-                        var newMatch = expandedInvoices.SingleOrDefault(tuple =>
-                            tuple.Prompt.Destination == transfer.Address);
-
-                        if (newMatch.Invoice == null)
-                        {
-                            return Task.CompletedTask;
-                        }
-
-                        invoice = newMatch.Invoice;
-                    }
-
-
-                    return HandlePaymentData(cryptoCode, transfer.Address, transfer.Amount, transfer.SubaddrIndex.Major,
-                        transfer.SubaddrIndex.Minor, transfer.Txid, transfer.Confirmations, transfer.Height, invoice,
-                        updatedPaymentEntities);
-                }));
-            }
+            // foreach (var keyValuePair in tasks)
+            // {
+            //     var transfers = keyValuePair.Value.Result.In;
+            //     if (transfers == null)
+            //     {
+            //         continue;
+            //     }
+            //
+            //     transferProcessingTasks.AddRange(transfers.Select(transfer =>
+            //     {
+            //         InvoiceEntity invoice = null;
+            //         var existingMatch = existingPaymentData.SingleOrDefault(tuple =>
+            //             tuple.Payment.Destination == transfer.Address &&
+            //             tuple.PaymentData.TransactionId == transfer.Txid);
+            //
+            //         if (existingMatch.Invoice != null)
+            //         {
+            //             invoice = existingMatch.Invoice;
+            //         }
+            //         else
+            //         {
+            //             var newMatch = expandedInvoices.SingleOrDefault(tuple =>
+            //                 tuple.Prompt.Destination == transfer.Address);
+            //
+            //             if (newMatch.Invoice == null)
+            //             {
+            //                 return Task.CompletedTask;
+            //             }
+            //
+            //             invoice = newMatch.Invoice;
+            //         }
+            //
+            //
+            //         return HandlePaymentData(cryptoCode, transfer.Address, transfer.Amount, transfer.SubaddrIndex.Major,
+            //             transfer.SubaddrIndex.Minor, transfer.Txid, transfer.Confirmations, transfer.Height, invoice,
+            //             updatedPaymentEntities);
+            //     }));
+            // }
 
             transferProcessingTasks.Add(
                 _paymentService.UpdatePayments(updatedPaymentEntities.Select(tuple => tuple.Item1).ToList()));
@@ -253,8 +247,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
                 }
             }
         }
-
-
+        
         public Task StopAsync(CancellationToken cancellationToken)
         {
             leases.Dispose();
@@ -262,117 +255,46 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
             return Task.CompletedTask;
         }
 
-        private async Task OnNewBlock(string cryptoCode)
-        {
-            await UpdateAnyPendingNanoLikePayment(cryptoCode);
-            _eventAggregator.Publish(new NewBlockEvent() { CryptoCode = cryptoCode });
-        }
-
-        private async Task OnTransactionUpdated(string cryptoCode, string transactionHash)
-        {
-            var paymentMethodId = PaymentTypes.CHAIN.GetPaymentMethodId(cryptoCode);
-            var transfer = await _NanoRpcProvider.WalletRpcClients[cryptoCode]
-                .SendCommandAsync<GetTransferByTransactionIdRequest, GetTransferByTransactionIdResponse>(
-                    "get_transfer_by_txid",
-                    new GetTransferByTransactionIdRequest() { TransactionId = transactionHash });
-
-            var paymentsToUpdate = new BlockingCollection<(PaymentEntity Payment, InvoiceEntity invoice)>();
-
-            //group all destinations of the tx together and loop through the sets
-            foreach (var destination in transfer.Transfers.GroupBy(destination => destination.Address))
-            {
-                //find the invoice corresponding to this address, else skip
-                var address = destination.Key + "#" + paymentMethodId;
-                var invoice = (await _invoiceRepository.GetInvoicesFromAddresses(new[] { address })).FirstOrDefault();
-                if (invoice == null)
-                {
-                    continue;
-                }
-
-                var index = destination.First().SubaddrIndex;
-
-                await HandlePaymentData(cryptoCode,
-                    destination.Key,
-                    0, //todo: fix
-                    index.Major,
-                    index.Minor,
-                    transfer.Transfer.Txid,
-                    transfer.Transfer.Confirmations,
-                    transfer.Transfer.Height
-                    , invoice, paymentsToUpdate);
-            }
-
-            if (paymentsToUpdate.Any())
-            {
-                await _paymentService.UpdatePayments(paymentsToUpdate.Select(tuple => tuple.Payment).ToList());
-                foreach (var valueTuples in paymentsToUpdate.GroupBy(entity => entity.invoice))
-                {
-                    if (valueTuples.Any())
-                    {
-                        _eventAggregator.Publish(new Events.InvoiceNeedUpdateEvent(valueTuples.Key.Id));
-                    }
-                }
-            }
-        }
-
-        private async Task HandlePaymentData(string cryptoCode, string address, UInt128 totalAmount, long subaccountIndex,
-            long subaddressIndex,
-            string txId, long confirmations, long blockHeight, InvoiceEntity invoice,
-            BlockingCollection<(PaymentEntity Payment, InvoiceEntity invoice)> paymentsToUpdate)
+        private async Task OnTransaction(string cryptoCode, NanoEvent transaction)
         {
             var network = _networkProvider.GetNetwork(cryptoCode);
             var pmi = PaymentTypes.CHAIN.GetPaymentMethodId(network.CryptoCode);
             var handler = (NanoLikePaymentMethodHandler)_handlers[pmi];
+            
+            // find the invoice corresponding to this address, else skip
+             var address = transaction.Destination + "#" + pmi;
+             var invoice = (await _invoiceRepository.GetInvoicesFromAddresses([address])).FirstOrDefault();
+             if (invoice == null)
+             {
+                 Console.WriteLine("couldn't find invoice with destination address: " + transaction.Destination);
+                 return;
+             }
 
-            var details = new NanoLikePaymentData()
-            {
-                SubaccountIndex = subaccountIndex,
-                SubaddressIndex = subaddressIndex,
-                TransactionId = txId,
-                ConfirmationCount = confirmations,
-                BlockHeight = blockHeight
-            };
-            var paymentData = new Data.PaymentData()
-            {
-                Status = GetStatus(details, invoice.SpeedPolicy) ? PaymentStatus.Settled : PaymentStatus.Processing,
-                Amount = NanoMoney.Convert(totalAmount),
-                Created = DateTimeOffset.UtcNow,
-                Id = $"{txId}#{subaccountIndex}#{subaddressIndex}",
-                Currency = network.CryptoCode
-            }.Set(invoice, handler, details);
-
-
-            var alreadyExistingPaymentThatMatches = GetAllNanoLikePayments(invoice, cryptoCode)
-                .Select(entity => (Payment: entity, PaymentData: handler.ParsePaymentDetails(entity.Details)))
-                .SingleOrDefault(c => c.Payment.PaymentMethodId == pmi);
-
-            //if it doesnt, add it and assign a new Nanolike address to the system if a balance is still due
-            if (alreadyExistingPaymentThatMatches.Payment == null)
-            {
-                var payment = await _paymentService.AddPayment(paymentData, [txId]);
-                if (payment != null)
-                    await ReceivedPayment(invoice, payment);
-            }
-            else
-            {
-                //else update it with the new data
-                alreadyExistingPaymentThatMatches.PaymentData = details;
-                alreadyExistingPaymentThatMatches.Payment.Details = JToken.FromObject(paymentData, handler.Serializer);
-                paymentsToUpdate.Add((alreadyExistingPaymentThatMatches.Payment, invoice));
-            }
+             var details = new NanoLikePaymentData()
+             {
+                 TransactionHash = transaction.Hash,
+             };
+             var paymentData = new PaymentData()
+             {
+                 Status = PaymentStatus.Settled,
+                 Amount = NanoMoney.Convert(UInt128.Parse(transaction.Amount)),
+                 Created = DateTimeOffset.UtcNow,
+                 Id = $"{transaction.Hash}",
+                 Currency = network.CryptoCode,
+                 InvoiceDataId = invoice.Id
+             }.Set(invoice, handler, details);
+            
+             var payment = await _paymentService.AddPayment(paymentData, [transaction.Hash]);
+             if (payment != null)
+             {
+                 Console.WriteLine("successfully added payment to _paymentService");
+                 await ReceivedPayment(invoice, payment);
+             }
+             else
+             {
+                 Console.WriteLine("failed to add payment to _paymentService");
+             }
         }
-
-        private bool GetStatus(NanoLikePaymentData details, SpeedPolicy speedPolicy)
-            => details.ConfirmationCount >= ConfirmationsRequired(speedPolicy);
-        public static int ConfirmationsRequired(SpeedPolicy speedPolicy)
-        => speedPolicy switch
-        {
-            SpeedPolicy.HighSpeed => 0,
-            SpeedPolicy.MediumSpeed => 1,
-            SpeedPolicy.LowMediumSpeed => 2,
-            SpeedPolicy.LowSpeed => 6,
-            _ => 6,
-        };
 
         private async Task UpdateAnyPendingNanoLikePayment(string cryptoCode)
         {

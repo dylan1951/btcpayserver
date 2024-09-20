@@ -5,12 +5,11 @@ namespace BTCPayServer.Services.Altcoins.Nano.Configuration
 {
     public class NanoLikeConfiguration
     {
-        public Dictionary<string, NanoLikeConfigurationItem> NanoLikeConfigurationItems { get; set; } =
-            new Dictionary<string, NanoLikeConfigurationItem>();
+        public Dictionary<string, NanoLikeConfigurationItem> NanoLikeConfigurationItems { get; set; } = new();
     }
 
     public class NanoLikeConfigurationItem
     {
-        public Uri DaemonRpcUri { get; set; }
+        public Uri PippinUri { get; set; }
     }
 }

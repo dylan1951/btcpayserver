@@ -1,38 +1,39 @@
+using System;
 using BTCPayServer.Filters;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BTCPayServer.Services.Altcoins.Nano.RPC
 {
     [Route("[controller]")]
-    [OnlyIfSupportAttribute("Nano")]
-    public class NanoLikeDaemonCallbackController : Controller
+    [OnlyIfSupportAttribute("XNO")]
+    public class NanoLikeCallbackController : Controller
     {
         private readonly EventAggregator _eventAggregator;
 
-        public NanoLikeDaemonCallbackController(EventAggregator eventAggregator)
+        public NanoLikeCallbackController(EventAggregator eventAggregator)
         {
             _eventAggregator = eventAggregator;
         }
-        [HttpGet("block")]
-        public IActionResult OnBlockNotify(string hash, string cryptoCode)
+        
+        [HttpPost("tx")]
+        public IActionResult OnTransactionNotify([FromQuery] string cryptoCode, [FromBody] TransactionCallback callback)
         {
+            Console.WriteLine($"OnTransactionNotify: {cryptoCode}, {callback.Hash}, {callback.Destination}, {callback.Amount}");
             _eventAggregator.Publish(new NanoEvent()
             {
-                BlockHash = hash,
+                Hash = callback.Hash,
+                Destination = callback.Destination,
+                Amount = callback.Amount,
                 CryptoCode = cryptoCode.ToUpperInvariant()
             });
             return Ok();
         }
-        [HttpGet("tx")]
-        public IActionResult OnTransactionNotify(string hash, string cryptoCode)
-        {
-            _eventAggregator.Publish(new NanoEvent()
-            {
-                TransactionHash = hash,
-                CryptoCode = cryptoCode.ToUpperInvariant()
-            });
-            return Ok();
-        }
-
+    }
+    
+    public class TransactionCallback
+    {
+        public string Hash { get; set; }
+        public string Destination { get; set; }
+        public string Amount { get; set; }
     }
 }
