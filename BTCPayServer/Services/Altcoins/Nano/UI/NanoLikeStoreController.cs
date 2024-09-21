@@ -79,8 +79,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.UI
             var pmi = PaymentTypes.CHAIN.GetPaymentMethodId(cryptoCode);
             var settings = nano.Where(method => method.PaymentMethodId == pmi).Select(m => m.Details).SingleOrDefault();
             _NanoRpcProvider.Summaries.TryGetValue(cryptoCode, out var summary);
-            _NanoLikeConfiguration.NanoLikeConfigurationItems.TryGetValue(cryptoCode,
-                out var configurationItem);
+            _NanoLikeConfiguration.NanoLikeConfigurationItems.TryGetValue(cryptoCode, out var configurationItem);
 
             return new NanoLikePaymentMethodViewModel()
             {
@@ -95,7 +94,6 @@ namespace BTCPayServer.Services.Altcoins.Nano.UI
         [HttpGet("{cryptoCode}")]
         public async Task<IActionResult> GetStoreNanoLikePaymentMethod(string cryptoCode)
         {
-            cryptoCode = cryptoCode.ToUpperInvariant();
             if (!_NanoLikeConfiguration.NanoLikeConfigurationItems.ContainsKey(cryptoCode))
             {
                 return NotFound();
@@ -143,6 +141,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.UI
             var blob = storeData.GetStoreBlob();
             storeData.SetPaymentMethodConfig(_handlers[PaymentTypes.CHAIN.GetPaymentMethodId(cryptoCode)], new NanoPaymentPromptDetails()
             {
+                
             });
 
             blob.SetExcluded(PaymentTypes.CHAIN.GetPaymentMethodId(viewModel.CryptoCode), !viewModel.Enabled);

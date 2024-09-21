@@ -68,7 +68,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Payments
             context.Prompt.Destination = address.Account;
             context.Prompt.Details = JObject.FromObject(new NanoPaymentPromptDetails()
             {
-                DepositAddress = address.Account
+                
             }, Serializer);
         }
 
@@ -84,9 +84,9 @@ namespace BTCPayServer.Services.Altcoins.Nano.Payments
         {
             return ParsePaymentMethodConfig(config);
         }
-        public NanoPaymentMethodConfig ParsePaymentMethodConfig(JToken config)
+        public NanoPaymentPromptDetails ParsePaymentMethodConfig(JToken config)
         {
-            return config.ToObject<NanoPaymentMethodConfig>(Serializer) ?? throw new FormatException($"Invalid {nameof(NanoPaymentMethodConfig)}");
+            return config.ToObject<NanoPaymentPromptDetails>(Serializer) ?? throw new FormatException($"Invalid {nameof(NanoLikePaymentMethodHandler)}");
         }
         
         class Prepare
