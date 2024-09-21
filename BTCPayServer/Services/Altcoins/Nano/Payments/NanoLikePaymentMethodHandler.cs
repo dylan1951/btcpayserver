@@ -63,7 +63,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Payments
             var nanoPrepare = (Prepare)context.State;
             var address = await nanoPrepare.ReserveAddress(invoice.Id);
             
-            context.TrackedDestinations.Add(address + "#");
+            context.TrackedDestinations.Add(address.Account);
             context.Prompt.PaymentMethodFee = 0;
             context.Prompt.Destination = address.Account;
             context.Prompt.Details = JObject.FromObject(new NanoPaymentPromptDetails()

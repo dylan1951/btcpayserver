@@ -262,8 +262,7 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
             var handler = (NanoLikePaymentMethodHandler)_handlers[pmi];
             
             // find the invoice corresponding to this address, else skip
-             var address = transaction.Destination + "#" + pmi;
-             var invoice = (await _invoiceRepository.GetInvoicesFromAddresses([address])).FirstOrDefault();
+             var invoice = await _invoiceRepository.GetInvoiceFromAddress(pmi, transaction.Destination);
              if (invoice == null)
              {
                  Console.WriteLine("couldn't find invoice with destination address: " + transaction.Destination);
