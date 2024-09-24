@@ -298,10 +298,10 @@ namespace BTCPayServer.Services.Altcoins.Nano.Services
         private async Task UpdateAnyPendingNanoLikePayment(string cryptoCode)
         {
             var paymentMethodId = PaymentTypes.CHAIN.GetPaymentMethodId(cryptoCode);
-            var invoices = await _invoiceRepository.GetInvoicesWithPendingPayments(paymentMethodId);
+            var invoices = await _invoiceRepository.GetMonitoredInvoices(paymentMethodId);
             if (!invoices.Any())
                 return;
-            invoices = invoices.Where(entity => entity.GetPaymentPrompt(paymentMethodId).Activated).ToArray();
+            invoices = invoices.Where(entity => entity.GetPaymentPrompt(paymentMethodId)?.Activated is true).ToArray();
             await UpdatePaymentStates(cryptoCode, invoices);
         }
 
