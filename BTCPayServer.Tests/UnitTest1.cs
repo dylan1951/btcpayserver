@@ -3157,7 +3157,15 @@ namespace BTCPayServer.Tests
             var invoiceId = GetInvoiceId(resp);
             await acc.PayOnChain(invoiceId);
 
-            app = await client.CreatePointOfSaleApp(acc.StoreId, new PointOfSaleAppRequest
+            // Quick unrelated test on GetMonitoredInvoices
+            var invoiceRepo = tester.PayTester.GetService<InvoiceRepository>();
+            var monitored = Assert.Single(await invoiceRepo.GetMonitoredInvoices(PaymentMethodId.Parse("BTC-CHAIN")), i => i.Id == invoiceId);
+            Assert.Single(monitored.Payments);
+			monitored = Assert.Single(await invoiceRepo.GetMonitoredInvoices(PaymentMethodId.Parse("BTC-CHAIN"), true), i => i.Id == invoiceId);
+			Assert.Single(monitored.Payments);
+			//
+
+			app = await client.CreatePointOfSaleApp(acc.StoreId, new PointOfSaleAppRequest
             {
                 AppName = "Cart",
                 DefaultView = PosViewType.Cart,
